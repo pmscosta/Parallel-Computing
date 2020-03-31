@@ -1,0 +1,4 @@
+ gfortran -o fort_matrix  matrixprod.F95 
+ g++ -O2 matrixprod.cpp -o fileout -lpapi    
+
+ ./runner.sh init_cols max_cols step implementation
