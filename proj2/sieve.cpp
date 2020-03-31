@@ -72,7 +72,7 @@ int sieve(uint32_t lastNumber, bool useOpenMP)
     {
         if (!isPrime[i / 2])
             for (uint32_t j = i * i; j <= lastNumber; j += 2 * i)
-                isPrime[j / 2] = 1;
+                isPrime[j >> 1] = 1;
     }
 
     int found = lastNumber >= 2 ? 1 : 0;
