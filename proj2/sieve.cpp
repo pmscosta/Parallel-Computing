@@ -47,10 +47,12 @@ int average_counter(int numTimes, uint32_t val)
     timeLogger << val << "," << average << endl;
 }
 
-int main()
+int main(int argc, char *argv[])
 {
     timeLogger.open("timeLogger.txt", std::ios_base::app);
-    average_counter(3, 1 * 1000 * 1000 * 1000LL);
+    int counter = atoi(argv[1]);
+	uint32_t val = atoi(argv[2]);
+    average_counter(counter, val);
     timeLogger.close();
     return 0;
 }
