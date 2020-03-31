@@ -4,31 +4,29 @@
 #include <string.h>
 #include <chrono>
 #include <cstdint>
-
-
-#include "omp.h"
+#include <omp.h>
 
 using namespace std;
 
-int eratosthenesOdd(uint32_t lastNumber, bool useOpenMP);
+int sieve(uint32_t lastNumber, bool useOpenMP);
 
 int main()
 {
 
     auto t1 = std::chrono::high_resolution_clock::now();
-    int found = eratosthenesOdd(1 * 1000 * 1000 * 1000LL, true);
+    int found = sieve(1 * 1000 * 1000 * 1000LL, true);
     auto t2 = std::chrono::high_resolution_clock::now();
 
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
 
     double seconds = duration / 1000000.0;
 
-    cout << "Found: " << found << " in " << seconds << " seconds." << endl;
+    cout << "Found: " << found << " primes in " << seconds << " seconds." << endl;
 
     return 0;
 }
 
-int eratosthenesOdd(uint32_t lastNumber, bool useOpenMP)
+int sieve(uint32_t lastNumber, bool useOpenMP)
 {
 
     omp_set_num_threads(useOpenMP ? omp_get_num_procs() : 1);
