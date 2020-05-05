@@ -10,4 +10,4 @@ To compile:
 
 To execute:
 * `./a.out <number>`
-* `mpiexec ./a.out <number> <debug_flag>`      
+* `mpiexec -np 8 ./a.out <number> <debug_flag>`      
