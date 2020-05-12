@@ -5,175 +5,127 @@
 #include <cstdio>
 #include <cstdlib>
 
-#define BLOCK_LOW(id , p, n) ((id)*(n) /(p))
-#define BLOCK_HIGH(id, p, n) (BLOCK_LOW(((id) + 1), p, n) -1)
-#define BLOCK_SIZE(id, p, n) ((BLOCK_LOW(((id) + 1), p, n)) - (BLOCK_LOW(id,p,n)))
+#define BLOCK_LOW(id, p, n) ((id) * (n) / (p))
+#define BLOCK_HIGH(id, p, n) (BLOCK_LOW(((id) + 1), p, n) - 1)
 
-void usage(void){
+
+void usage(void)
+{
     std::cout << "sieve <max number>" << std::endl;
-    std::cout << "<max number> range between 2 and N." <<std::endl;
-
+    std::cout << "<max number> range between 2 and N." << std::endl;
 }
 
-int main (int argc, char * argv[]){
-    double  elapsed_time;
+ulong singleBlock(ulong from, ulong to);
 
-    MPI_Init (&argc, &argv);
+int main(int argc, char *argv[])
+{
+    double elapsed_time;
+
+    MPI_Init(&argc, &argv);
 
     MPI_Barrier(MPI_COMM_WORLD);
     elapsed_time = -MPI_Wtime();
 
     int process_id;
-    MPI_Comm_rank (MPI_COMM_WORLD, &process_id);
+    MPI_Comm_rank(MPI_COMM_WORLD, &process_id);
 
     int num_processes;
-    MPI_Comm_size (MPI_COMM_WORLD, &num_processes);
+    MPI_Comm_size(MPI_COMM_WORLD, &num_processes);
 
-    if (argc != 2){
-        if(process_id == 0 ){
+    if (argc != 2)
+    {
+        if (process_id == 0)
+        {
             usage();
             MPI_Finalize();
             exit(1);
         }
     }
 
-    ulong   range_max= atol(argv[1]);
+    ulong range_max = atol(argv[1]);
 
-    ulong   sqrtn = ceil(sqrt((ulong  )range_max));
+    // ulong sqrtn = ceil(sqrt((ulong)range_max));
 
-    char * pre_marked = (char *) malloc(sqrtn + 1);
-    pre_marked[0] = 1;
-    pre_marked[1] = 1;
+    ulong low_value = 2 + BLOCK_LOW(process_id, num_processes, range_max -1);
+    ulong high_value = 2+ BLOCK_HIGH(process_id, num_processes, range_max-1);
 
-    for (ulong   i = 2; i <=sqrtn; ++i){
-        pre_marked[i] = 0;
-    }
-    ulong   pre_k=2;
+    // printf("%ld %ld\n", low_value, high_value);
 
-    do
+    ulong from;
+    ulong found = 0;
+    ulong count = 0;
+    const ulong slice = 256000;
+
+    for (from = low_value; from <= high_value; from += slice)
     {
-        ulong   base= pre_k * pre_k;
-        for(ulong   i =  base; i <= sqrtn; i+= pre_k)
-            pre_marked[i] = 1;
+        ulong to = from + slice;
 
-        while(pre_marked[(ulong )++pre_k]);
+        if (to > high_value)
+            to = high_value;
 
-    } while (pre_k * pre_k <= sqrtn);
+        found += singleBlock(from, to);
     
-    std::vector<int> kset;
-    for(ulong   i = 3; i<=sqrtn; ++i){
-        if(pre_marked[i] == 0)
-            kset.push_back(i);
     }
 
-    free(pre_marked);
+    MPI_Reduce(&found, &count, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
-    if(kset.empty()){
-        std::cout << "There is 1 prime less than or equal to 2." << std::endl;
-        exit(0);
-    }
+    elapsed_time += MPI_Wtime();
 
-    ulong   low_value = 2.0 + BLOCK_LOW(process_id, num_processes, range_max - 1);
-    ulong   high_value = 2.0 + BLOCK_HIGH(process_id, num_processes, range_max -1);
-    ulong   block_size = BLOCK_SIZE(process_id, num_processes, range_max -1);
+    if (process_id == 0)
+    {
+        printf("Found %lu primes\n", count);
+        printf("Time: %3.3f seconds \n", elapsed_time);
 
-    if (low_value % (ulong ) 2.0 == 0){
-        if(high_value % (ulong ) 2.0 == 0){
-            block_size = (ulong  ) floor((ulong  ) block_size /2.0);
-            high_value--;
-        }
-        else{
-            block_size = block_size/2.0;
-        }
-        low_value++;
-    }else{
-        if(high_value % 2 == 0){
-            block_size = block_size/2.0;
-        }
-        else{
-            block_size = (ulong  )ceil((ulong  ) block_size /2.0);
-        }
-    }
-
-    int temp = (range_max -1) / num_processes;
-
-    if ((2 + temp) < (ulong  ) sqrt((ulong  ) range_max)){
-        if (process_id == 0){
-            std::cout << "Too many processed!" << std::endl;
-            std::cout << "Process should be greater equal than sqrt(n)." << std::endl;
-        }
-        MPI_Finalize();
-        exit(1);
-    }
-
-    char * marked = (char *) malloc (block_size);
-
-    if(marked == NULL){
-        std::cout << "Process " << process_id << " cannot allocate enough memory" << std::endl;
-        MPI_Finalize();
-        exit(1);
-    }
-
-    for (ulong   i =0; i < block_size;i++){
-        marked[i] = 0;
-    }
-
-    ulong   first_index;
-    if (process_id == 0){
-        first_index=0;
-    }
-
-    ulong   kindex = 0;
-
-    ulong   k = kset[kindex];
-
-    ulong   count = 1;
-
-    do{
-        if(k>= low_value){
-            first_index= ((k - low_value) /2) + k;
-        }else if(k*k > low_value){
-            first_index = (k*k - low_value) /2;
-        }else{
-            if (low_value % k == 0){
-                first_index = 0;
-            }else{
-                first_index = 0;
-                while((low_value + (2*first_index)) % k !=0)
-                    ++first_index;
-            }
-        }
-
-        for(ulong   i = first_index; i < block_size; i+=(k))
-            marked[i]=1;
-
-        k = kset[++kindex];
-    }while (k*k <= range_max && kindex < (ulong  ) kset.size());
-
-    ulong   local_count = 0;
-
-    for (ulong   i = 0; i < block_size;i++){
-        if(marked[i] == 0){
-            ++local_count;
-        }
-    }
-
-    free(marked); marked = 0;
-
-    MPI_Reduce (&local_count, &count, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-    elapsed_time+=MPI_Wtime();
-
-    if (process_id == 0){
-        std::cout << count << " primes found between 2 and " << range_max << std::endl;
-
-        char st[200];
-        sprintf(st, "Time: %3.3f seconds \n", elapsed_time);
-
-        std::cout << st;
     }
 
     MPI_Finalize();
 
     return 0;
+}
+
+ulong singleBlock(ulong from, ulong to)
+{
+    const ulong memorySize = (to - from + 1) / 2.0;
+
+    char *isPrime = new char[memorySize];
+
+    for (ulong i = 0; i < memorySize; i++)
+        isPrime[i] = 1;
+
+    for (ulong i = 3; i * i <= to; i += 2)
+    {
+        if (i >= 3 * 3 && i % 3 == 0)
+            continue;
+        if (i >= 5 * 5 && i % 5 == 0)
+            continue;
+        if (i >= 7 * 7 && i % 7 == 0)
+            continue;
+        if (i >= 11 * 11 && i % 11 == 0)
+            continue;
+        if (i >= 13 * 13 && i % 13 == 0)
+            continue;
+
+        ulong  minJ = ((from + i - 1) / i) * i;
+        if (minJ < i * i)
+            minJ = i * i;
+        // start value must be odd
+        if ((minJ & 1) == 0)
+            minJ += i;
+
+        // find all odd non-primes
+        for (ulong j = minJ; j <= to; j += 2 * i)
+        {
+            ulong index = j - from;
+            isPrime[index / 2] = 0;
+        }
+    }
+
+    ulong found = 0;
+    for (ulong i = 0; i < memorySize; i++)
+        found += isPrime[i];
+    // 2 is not odd => include on demand
+    if (from <= 2)
+        found++;
+
+    return found;
 }

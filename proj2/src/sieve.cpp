@@ -43,7 +43,7 @@ int sieve_seq(u_long lastNumber)
 int sieve_omp(u_long lastNumber)
 {
 
-    omp_set_num_threads(omp_get_num_procs());
+    omp_set_num_threads(8);
 
     const u_long lastNumberSqrt = (int)sqrt((double)lastNumber);
 
@@ -79,7 +79,7 @@ int average_counter(int numTimes, int f(u_long))
     // 3 iterations. don't know how many are needed
     u_long step = (end - start) / 4;
 
-    map<u_long, double> times;
+    map<u_long, vector<double>> times;
 
     for (int i = 0; i < numTimes; i++)
     {
@@ -93,9 +93,9 @@ int average_counter(int numTimes, int f(u_long))
 
             double seconds = duration / 1000000.0;
 
-            // cout << "Found: " << found << " primes in " << seconds << " seconds." << endl;
+            cout << "Found: " << found << " primes in " << seconds << " seconds." << endl;
 
-            times[val] += seconds;
+            times[val].push_back(seconds);
         }
     }
 
@@ -103,8 +103,14 @@ int average_counter(int numTimes, int f(u_long))
 
     for (auto const &entry : times)
     {
-        cout << "For " << entry.first << ", average: " << entry.second / 4.0 << " seconds\n";
-        timeLogger << entry.first << "," << entry.second / 4.0 << endl;
+        double total = 0; 
+        for(double time : entry.second){
+            total += time;
+        }
+
+        double avg_time = (double) (total / entry.second.size());
+        cout << "For " << entry.first << ", average: " << avg_time << " seconds\n";
+        timeLogger << entry.first << "," << avg_time << endl;
     }
 }
 
@@ -112,7 +118,7 @@ int main(int argc, char *argv[])
 {
     timeLogger.open("timeLogger.txt", std::ios_base::app);
     int counter = atoi(argv[1]);
-    average_counter(counter, sieve_seq);
+    average_counter(counter, sieve_omp);
     timeLogger.close();
     return 0;
 }
